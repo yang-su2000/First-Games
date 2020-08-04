@@ -1,0 +1,328 @@
+<canvas id="gc" width="600" height="600"></canvas> 
+<script>
+let canvas=document.getElementById("gc");
+let context=canvas.getContext("2d");
+
+// customize game (int)
+const gameSize = 300 // (== width/2 == height/2) >= 20*split
+const split = 15 // >= 10
+const difficulty = 20 // 1~20
+
+const colorBox = ['blue', 'grey', 'orange', 'yellow', 'green', 'purple', 'red', 'black']
+let fontSize = Math.round(gameSize/10)
+let fontx = Math.round(gameSize + gameSize/5)
+let fonty = Math.round(gameSize/10)
+let bsize = Math.round(gameSize/split)
+let bwide = Math.round(gameSize/(split*20))
+let bside = Math.round(gameSize/split - gameSize/(split*20))
+
+let gamebox = new Array(split*2);
+for (var i=0; i<split*2; i++) {
+    gamebox[i]=new Array(split);
+	for (var j=0; j<split; j++) gamebox[i][j]=7;
+}
+let score = 0
+let count = 0
+
+class Box { 
+    constructor(x, y, btype) {
+	    this.x = x;
+		this.y = y;
+		this.btype = btype;
+	}
+	validmove(x, y) {
+	    if (this.x + x >= 0 && this.x + x < split && this.x + x >=0 && this.y + y < split * 2){
+		    return gamebox[this.y + y][this.x + x] == 7;
+		}
+		//console.log("not valid");
+		return false;
+	}
+	setbox(x, y, btype) {
+	    this.x = x;
+		this.y = y;
+		this.btype = btype;
+	}
+	move(x, y) {
+	    this.x += x;
+		this.y += y;
+	}
+	draw() {
+	    drawbox(this.x, this.y, this.btype);
+	}
+	dedraw() {
+	    drawbox(this.x, this.y, 7);
+	}
+	hit() {
+	    if (this.y >= 2*split-1) return true;
+		return gamebox[this.y+1][this.x] < 7;
+	}
+	validrotate(x, y) {
+	    return this.validmove(y - this.y + x - this.x, y - this.y - x + this.x);
+	}
+	rotate(x, y) {
+	    var mx = x - this.x;
+		var my = y - this.y;
+		//console.log("x += " + (y - this.y + x - this.x));
+		//console.log("y += " + (y - this.y - x + this.x));
+		this.x += my + mx;
+		this.y += my - mx;
+	}
+}
+
+class Piece {
+	
+    constructor(btype) {
+	    this.btype = btype;
+		this.x = Math.round(split/2);
+		this.y = 1;
+		this.boxes = new Array(0);
+		
+		if (this.btype == 0) {
+		    this.y -= 1;
+			for (var i=-2; i<2; i++) {
+			    var newBox = new Box(this.x + i, this.y, this.btype);
+				this.boxes.push(newBox);
+			}
+		} else if (this.btype == 1) {
+		    var newBox = new Box(this.x, this.y - 1, this.btype);
+			this.boxes.push(newBox);
+			for (var i=0; i<3; i++) {
+			    newBox = new Box(this.x + i, this.y, this.btype);
+				this.boxes.push(newBox);
+			}
+		} else if (this.btype == 2) {
+		    var newBox = new Box(this.x, this.y - 1, this.btype);
+			this.boxes.push(newBox);
+			for (var i=-2; i<1; i++) {
+			    newBox = new Box(this.x + i, this.y, this.btype);
+				this.boxes.push(newBox);
+			}
+		} else if (this.btype == 3) {
+		    for (var j=-1; j<1; j++) {
+                for (var i=-1; i<1; i++) {
+                    var newBox = new Box(this.x + i, this.y + j, this.btype);
+                    this.boxes.push(newBox);
+				}
+			}
+		} else if (this.btype == 4) {
+		    for (var i=-1; i<1; i++) {
+			    var newBox = new Box(this.x + i, this.y - 1, this.btype);
+				this.boxes.push(newBox);
+			}
+			for (var i=-2; i<0; i++) {
+			    var newBox = new Box(this.x + i, this.y, this.btype);
+				this.boxes.push(newBox);
+			}
+		} else if (this.btype == 5) {
+		    var newBox = new Box(this.x, this.y - 1, this.btype);
+			this.boxes.push(newBox);
+			for (var i=-1; i<2; i++) {
+			    newBox = new Box(this.x + i, this.y, this.btype);
+				this.boxes.push(newBox);
+			}
+		} else if (this.btype == 6) {
+		    for (var i=-2; i<0; i++) {
+			    var newBox = new Box(this.x + i, this.y - 1, this.btype);
+				this.boxes.push(newBox);
+			}
+			for (var i=-1; i<1; i++) {
+			    var newBox = new Box(this.x + i, this.y, this.btype);
+				this.boxes.push(newBox);
+			}
+		} else console.log(this.btype + " is not valid btype");
+	}
+
+	draw() {
+	    for (var i=0; i<4; i++) this.boxes[i].draw();
+	}
+	
+	dedraw() {
+	    for (var i=0; i<4; i++) this.boxes[i].dedraw();
+	}
+	hit() {
+	    this.dedraw();
+		for (var i=0; i<4; i++) {
+		    if (this.boxes[i].validmove(0, 1) == false) {
+			    this.draw();
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	movedown() {
+	    this.y += 1;
+		for (var i=0; i<4; i++) {this.boxes[i].move(0, 1);}
+	}
+	
+	instantdown() {
+	    while (this.hit() == false) {
+		    this.movedown();
+			score += difficulty;
+		}
+	}
+	
+	moveleft() {
+	    this.dedraw();
+		for (var i=0; i<4; i++) {
+		    if (this.boxes[i].validmove(-1, 0) == false) {
+			    console.log("hitleft");
+			    this.draw();
+				return;
+			}
+		}
+		this.x -= 1;
+		for (var i=0; i<4; i++) {this.boxes[i].move(-1, 0);}
+		this.draw();
+	}
+	
+	moveright() {
+	    this.dedraw();
+		for (var i=0; i<4; i++) {
+		    if (this.boxes[i].validmove(1, 0) == false) {
+			    this.draw();
+				return;
+			}
+		}
+		this.x += 1;
+		for (var i=0; i<4; i++) {this.boxes[i].move(1, 0);}
+		this.draw();
+	}
+	
+	combine() { // optimization required
+	    var res = false
+		for (var j=0; j<split*2; j++) {
+		    var isfull = true
+			for (var i=0; i<split; i++) {
+			    if (gamebox[j][i] == 7) isfull = false;
+			}
+			if (isfull) {
+			    console.log("combine");
+			    res = true;
+				var endy = j;
+				while (endy > 0) {
+				    for (var i=0; i<split; i++) {
+					    drawbox(i, endy, gamebox[endy - 1][i]);
+					}
+					endy--;
+				}
+			}
+		}
+		return res;
+	}
+	
+	rotate() {
+	    if (this.btype == 3) return;
+		this.dedraw();
+		for (var i=0; i<4; i++) {
+		    if (this.boxes[i].validrotate(this.x, this.y) == 0) {
+			    this.draw();
+				return;
+			}
+		}
+		for (var i=0; i<4; i++) {
+		    this.boxes[i].rotate(this.x, this.y);
+		}
+		this.draw();
+	}
+}
+
+function printScreen() { // debug
+    console.log(gamebox);
+}
+
+function drawbox(x, y, btype) {
+    //console.log("x " + x, "y " + y,"btype: " + btype);
+    gamebox[y][x] = btype;
+	context.fillStyle = colorBox[btype];
+    context.fillRect(x * bsize + bwide, y * bsize + bwide, bside, bside);
+}
+
+function randint(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function redrawGameWindow() {
+    myPiece.draw();
+	context.fillStyle = 'black';
+	context.fillRect(gameSize + 1, 0, gameSize, gameSize * 2);
+	context.font = '30px comicsansms';
+	context.fillStyle = 'red';
+	context.fillText('Score: ' + score, fontx, fonty);
+	//printScreen();
+}
+
+function setup() {
+    context.fillStyle = 'black';
+	context.fillRect(0, 0, gameSize, gameSize * 2);
+	for (var x=0; x<split+1; x++) {
+	    context.fillStyle = 'white';
+		context.fillRect(x * bsize, 0, bwide, gameSize * 2);
+	}
+	for (var y=0; y<split*2+1; y++) {
+	    context.fillStyle = 'white';
+		context.fillRect(0, y * bsize, gameSize, bwide);
+	}
+	context.font = '30px comicsansms';
+	context.fillStyle = 'red';
+	context.fillText('Score: ' + score, fontx, fonty);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (run == false) return;
+  // left arrow key
+  if (e.which == 37) myPiece.moveleft();
+  // right arrow key
+  else if (e.which == 39) myPiece.moveright();
+  // down key
+  else if (e.which == 40) myPiece.instantdown();
+  // space key
+  else if (e.which == 32) myPiece.rotate();
+  // quit == Q key
+  else if (e.which == 81) run = false;
+});
+
+let newPiece = true
+let run = true
+let pause = false
+let myPiece = new Piece(randint(0, 6));
+var backupcontext;
+
+function game() {
+    if (run == false) {context = null; return;}
+	    
+	requestAnimationFrame(game);
+	if (++count < (25-difficulty)) return;
+	count = 0;
+    
+	if (newPiece) {
+		console.log("New Piece");
+		myPiece = new Piece(randint(0, 6));
+		
+		newPiece = false;
+		if (myPiece.hit()) {
+			console.log("Game Over");
+			run = false;
+			return;
+		}
+	}
+	
+	if (myPiece.hit() == true) {
+		console.log("hit");
+		newPiece = true;
+		if (myPiece.combine()) {
+			score += 100 * difficulty;
+		} else {
+		    score += difficulty;
+		    redrawGameWindow();
+		}
+	} else {
+		myPiece.movedown();
+		score += difficulty;
+		redrawGameWindow();
+	}
+}
+
+setup();
+requestAnimationFrame(game);
+</script>
